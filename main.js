@@ -98,7 +98,7 @@ async function loadData() {
                     displayName = `${first} ${last}`;
                 }
                 const center = layer.getBounds().getCenter();
-                L.marker(center, {
+                const marker = L.marker(center, {
                     icon: L.divIcon({
                         className: 'district-label',
                         html: displayName,
@@ -106,6 +106,22 @@ async function loadData() {
                         iconAnchor: [100, 25]
                     })
                 }).addTo(map);
+
+                // Add click event for popup with counties and committees
+                marker.on('click', () => {
+                    const counties = (leg.Counties && leg.Counties.length)
+                        ? `<b>Counties Served:</b><ul>${leg.Counties.map(c => `<li>${c}</li>`).join('')}</ul>`
+                        : '<b>Counties Served:</b> <i>None listed</i>';
+                    const committees = (leg.Committees && leg.Committees.length)
+                        ? `<b>Committees:</b><ul>${leg.Committees.map(com => `<li>${com.name}${com.role ? ' (' + com.role + ')' : ''}</li>`).join('')}</ul>`
+                        : '<b>Committees:</b> <i>None listed</i>';
+                    const popupContent = `
+                        <strong>${displayName}</strong><br>
+                        ${counties}
+                        ${committees}
+                    `;
+                    marker.bindPopup(popupContent).openPopup();
+                });
             }
         }
     }).addTo(map);

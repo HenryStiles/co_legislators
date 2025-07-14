@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup, Tag
 import pandas as pd # Using pandas for easy table creation and display
 import json
+import time
 
 def scrape_legislator_data(url):
     """
@@ -67,12 +68,39 @@ def scrape_legislator_data(url):
                 party_elem = cells[3].find('div', class_='field-content')
                 party = party_elem.get_text(strip=True) if party_elem else "N/A"
 
+                # --- Fetch detail page for committees and counties ---
+                committees = []
+                counties = []
+                if legislator_link != "N/A":
+                    try:
+                        detail_resp = requests.get(legislator_link)
+                        detail_resp.raise_for_status()
+                        detail_soup = BeautifulSoup(detail_resp.text, 'html.parser')
+                        # Committees
+                        for cblock in detail_soup.select('.committee-assignment'):
+                            cname_elem = cblock.select_one('.committee-link a')
+                            role_elem = cblock.select_one('.committee-role span')
+                            cname = cname_elem.get_text(strip=True) if cname_elem else ""
+                            role = role_elem.get_text(strip=True) if role_elem else ""
+                            if cname:
+                                committees.append({"name": cname, "role": role})
+                        # Counties
+                        for county_elem in detail_soup.select('.field-name-field-counties .field-item'):
+                            county = county_elem.get_text(strip=True)
+                            if county:
+                                counties.append(county)
+                        time.sleep(0.2)  # Be polite to the server
+                    except Exception as e:
+                        print(f"Error fetching details for {name}: {e}")
+
                 legislators_data.append({
                     "District": district,
                     "Chamber": chamber,
                     "Name": name,
                     "Party": party,
-                    "Link": legislator_link
+                    "Link": legislator_link,
+                    "Committees": committees,
+                    "Counties": counties
                 })
     except requests.exceptions.RequestException as e:
         print(f"Error fetching data from {url}: {e}")

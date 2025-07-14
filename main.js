@@ -1,6 +1,29 @@
 // Load both GeoJSON and legislator data, then render the map
 async function loadData() {
-    // Use Turf.js for accurate centroid calculation
+    // Helper: compute centroid of a Polygon or MultiPolygon
+    function getPolygonCentroid(geometry) {
+        let coords = [];
+        if (geometry.type === 'Polygon') {
+            coords = geometry.coordinates[0];
+        } else if (geometry.type === 'MultiPolygon') {
+            // Use the largest polygon
+            let maxLen = 0;
+            geometry.coordinates.forEach(ring => {
+                if (ring[0].length > maxLen) {
+                    maxLen = ring[0].length;
+                    coords = ring[0];
+                }
+            });
+        } else {
+            return null;
+        }
+        let x = 0, y = 0, n = coords.length;
+        coords.forEach(([lng, lat]) => {
+            x += lng;
+            y += lat;
+        });
+        return [y / n, x / n]; // [lat, lng]
+    }
 
     const [geoRes, legRes, countyRes] = await Promise.all([
         fetch('senate_coords.json'),

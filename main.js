@@ -130,51 +130,38 @@ async function loadData() {
             onEachFeature: (feature, layer) => {
                 const district = feature.properties.District;
                 const leg = legMap[String(district)];
-                // Add popup
+                // Build popup content with all info
+                let displayName = leg?.Name || 'Unknown';
+                if (displayName.includes(',')) {
+                    const [last, first] = displayName.split(',').map(s => s.trim());
+                    displayName = `${first} ${last}`;
+                }
+                const counties = (leg?.Counties && leg.Counties.length)
+                    ? `<b>Counties Served:</b><ul>${leg.Counties.map(c => `<li>${c}</li>`).join('')}</ul>`
+                    : '<b>Counties Served:</b> <i>None listed</i>';
+                const committees = (leg?.Committees && leg.Committees.length)
+                    ? `<b>Committees:</b><ul>${leg.Committees.map(com => `<li>${com.name}${com.role ? ' (' + com.role + ')' : ''}</li>`).join('')}</ul>`
+                    : '<b>Committees:</b> <i>None listed</i>';
                 const popupContent = `
-                    <strong>District ${district}</strong><br>
-                    ${(() => {
-                        if (leg?.Name && leg.Name.includes(',')) {
-                            const [last, first] = leg.Name.split(',').map(s => s.trim());
-                            return `${first} ${last}`;
-                        }
-                        return leg?.Name || 'Unknown';
-                    })()}<br>
-                    ${leg?.Party || 'Unknown Party'}
+                    <strong>District ${district} &mdash; ${leg?.Party || 'Unknown Party'}</strong><br>
+                    <span style="font-size:1.1em; font-weight:bold;">${displayName}</span><br>
+                    ${counties}
+                    ${committees}
                 `;
                 layer.bindPopup(popupContent);
 
-                // Add district labels (clickable for popup with counties/committees)
+                // Add non-interactive district label for visual clarity
                 if (leg?.Name) {
-                    let displayName = leg.Name;
-                    if (displayName.includes(',')) {
-                        const [last, first] = displayName.split(',').map(s => s.trim());
-                        displayName = `${first} ${last}`;
-                    }
                     const center = layer.getBounds().getCenter();
-                    const marker = L.marker(center, {
+                    L.marker(center, {
                         icon: L.divIcon({
                             className: 'district-label',
                             html: displayName,
                             iconSize: [200, 50],
                             iconAnchor: [100, 25]
-                        })
+                        }),
+                        interactive: false // Make label non-interactive
                     }).addTo(mapInstance);
-                    marker.on('click', () => {
-                        const counties = (leg.Counties && leg.Counties.length)
-                            ? `<b>Counties Served:</b><ul>${leg.Counties.map(c => `<li>${c}</li>`).join('')}</ul>`
-                            : '<b>Counties Served:</b> <i>None listed</i>';
-                        const committees = (leg.Committees && leg.Committees.length)
-                            ? `<b>Committees:</b><ul>${leg.Committees.map(com => `<li>${com.name}${com.role ? ' (' + com.role + ')' : ''}</li>`).join('')}</ul>`
-                            : '<b>Committees:</b> <i>None listed</i>';
-                        const popupContent = `
-                            <strong>District ${district} &mdash; ${leg.Party || 'Unknown Party'}</strong><br>
-                            <span style="font-size:1.1em; font-weight:bold;">${displayName}</span><br>
-                            ${counties}
-                            ${committees}
-                        `;
-                        marker.bindPopup(popupContent).openPopup();
-                    });
                 }
             }
         }).addTo(mapInstance);

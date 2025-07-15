@@ -4,16 +4,15 @@ import pandas as pd # Using pandas for easy table creation and display
 import json
 import time
 
-def scrape_legislator_data(url):
+def fetch_legislator_data(url):
     """
-    Scrapes legislator data (district, chamber, link) from the provided URL.
+    Fetches legislator data (district, chamber, link) from the provided URL.
 
     Args:
-        url (str): The URL of the webpage to scrape.
+        url (str): The URL of the webpage to fetch.
 
     Returns:
-        list: A list of dictionaries, where each dictionary represents a legislator
-              with 'District', 'Chamber', and 'Link' keys.
+        list of dict: Each dict contains legislator info.
     """
     legislators_data = []
     base_url = "https://leg.colorado.gov" # Base URL for constructing absolute links
@@ -105,14 +104,14 @@ def scrape_legislator_data(url):
         print(f"An unexpected error occurred: {e}")
     return legislators_data
 
-# URL of the webpage to scrape
+# URL of the webpage to fetch
 target_url = "https://leg.colorado.gov/legislators"
 
-# Scrape the live webpage content
-scraped_data = scrape_legislator_data(target_url)
+# Fetch the live webpage content
+fetched_data = fetch_legislator_data(target_url)
 
 # Convert to Pandas DataFrame for easy table formatting
-df = pd.DataFrame(scraped_data)
+df = pd.DataFrame(fetched_data)
 
 # Print the Markdown table
 print(df.to_markdown(index=False))

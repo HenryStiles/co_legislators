@@ -168,7 +168,8 @@ async function loadData() {
                             ? `<b>Committees:</b><ul>${leg.Committees.map(com => `<li>${com.name}${com.role ? ' (' + com.role + ')' : ''}</li>`).join('')}</ul>`
                             : '<b>Committees:</b> <i>None listed</i>';
                         const popupContent = `
-                            <strong>${displayName}</strong><br>
+                            <strong>District ${district} &mdash; ${leg.Party || 'Unknown Party'}</strong><br>
+                            <span style="font-size:1.1em; font-weight:bold;">${displayName}</span><br>
                             ${counties}
                             ${committees}
                         `;

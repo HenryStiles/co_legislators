@@ -18,13 +18,26 @@
             color: black;
             text-shadow: none;
         }
+        .nav-link-right {
+            display: block;
+            text-align: right;
+            margin-bottom: 8px;
+        }
+        h2 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-top: 32px;
+            margin-bottom: 18px;
+        }
     </style>
 </head>
-<body>
-    <h2>Colorado Senate District Map</h2>
+<body id="top">
+    <a href="#house-map" class="nav-link-right">Colorado House District Map</a>
+    <h2 id="senate-map">Colorado Senate District Map</h2>
     <div id="map"></div>
     <hr class="map-divider">
     <h2>Colorado House District Map</h2>
+    <a href="#top" class="nav-link-right">Back to Senate Map</a>
     <div id="house-map"></div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="main.js"></script>

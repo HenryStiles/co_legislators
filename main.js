@@ -1,6 +1,22 @@
+/**
+ * Colorado Legislative District Maps
+ * 
+ * This script creates interactive maps for Colorado Senate and House districts
+ * using Leaflet.js. It loads legislator data and geographic boundaries,
+ * then renders color-coded districts with detailed popup information.
+ * 
+ * @author Your Name
+ * @version 1.0
+ */
+
 // Load both GeoJSON and legislator data, then render the map
 async function loadData() {
-    // Helper: compute centroid of a Polygon or MultiPolygon
+    /**
+     * Helper: compute centroid of a Polygon or MultiPolygon
+     * 
+     * @param {Object} geometry - GeoJSON geometry object
+     * @returns {Array|null} [lat, lng] coordinates of centroid, or null if invalid
+     */
     function getPolygonCentroid(geometry) {
         let coords = [];
         if (geometry.type === 'Polygon') {
@@ -25,6 +41,7 @@ async function loadData() {
         return [y / n, x / n]; // [lat, lng]
     }
 
+    // Load all data files concurrently
     const [senateGeoRes, legRes, countyRes, houseGeoRes] = await Promise.all([
         fetch('senate_coords.json'),
         fetch('legislators.json'),
@@ -47,7 +64,12 @@ async function loadData() {
         }
     });
 
-    // Party color mapping (lighter shades)
+    /**
+     * Party color mapping (lighter shades for better visibility)
+     * 
+     * @param {string} party - Political party name
+     * @returns {string} Hex color code for the party
+     */
     const partyColor = party => {
         if (!party) return '#fff59d'; // light yellow
         const p = party.toLowerCase();
@@ -62,6 +84,7 @@ async function loadData() {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
+    // County labels for Senate map
     let countyLabels = [];
     const countyLayer = L.geoJSON(counties, {
         style: {
@@ -85,6 +108,9 @@ async function loadData() {
         }
     });
 
+    /**
+     * Custom control for toggling county visibility on Senate map
+     */
     const CountyToggleControl = L.Control.extend({
         options: { position: 'bottomright' },
         onAdd: function(map) {
@@ -114,6 +140,13 @@ async function loadData() {
     });
     map.addControl(new CountyToggleControl());
 
+    /**
+     * Creates and adds a district layer to the specified map
+     * 
+     * @param {Object} geojson - GeoJSON data for districts
+     * @param {Object} legMap - Mapping of district numbers to legislator data
+     * @param {L.Map} mapInstance - Leaflet map instance to add the layer to
+     */
     const addDistrictLayer = (geojson, legMap, mapInstance) => {
         L.geoJSON(geojson, {
             style: feature => {
@@ -130,7 +163,8 @@ async function loadData() {
             onEachFeature: (feature, layer) => {
                 const district = feature.properties.District;
                 const leg = legMap[String(district)];
-                // Build popup content with all info
+                
+                // Build popup content with all legislator information
                 let displayName = leg?.Name || 'Unknown';
                 if (displayName.includes(',')) {
                     const [last, first] = displayName.split(',').map(s => s.trim());
@@ -200,6 +234,9 @@ async function loadData() {
         }
     });
 
+    /**
+     * Custom control for toggling county visibility on House map
+     */
     const HouseCountyToggleControl = L.Control.extend({
         options: { position: 'bottomright' },
         onAdd: function(map) {

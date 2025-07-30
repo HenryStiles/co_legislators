@@ -11,36 +11,6 @@
 
 // Load both GeoJSON and legislator data, then render the map
 async function loadData() {
-    /**
-     * Helper: compute centroid of a Polygon or MultiPolygon
-     * 
-     * @param {Object} geometry - GeoJSON geometry object
-     * @returns {Array|null} [lat, lng] coordinates of centroid, or null if invalid
-     */
-    function getPolygonCentroid(geometry) {
-        let coords = [];
-        if (geometry.type === 'Polygon') {
-            coords = geometry.coordinates[0];
-        } else if (geometry.type === 'MultiPolygon') {
-            // Use the largest polygon
-            let maxLen = 0;
-            geometry.coordinates.forEach(ring => {
-                if (ring[0].length > maxLen) {
-                    maxLen = ring[0].length;
-                    coords = ring[0];
-                }
-            });
-        } else {
-            return null;
-        }
-        let x = 0, y = 0, n = coords.length;
-        coords.forEach(([lng, lat]) => {
-            x += lng;
-            y += lat;
-        });
-        return [y / n, x / n]; // [lat, lng]
-    }
-
     // Load all data files concurrently
     const [senateGeoRes, legRes, countyRes, houseGeoRes] = await Promise.all([
         fetch('senate_coords.json'),
@@ -51,7 +21,6 @@ async function loadData() {
     const senateGeojson = await senateGeoRes.json();
     const legislators = await legRes.json();
     const counties = await countyRes.json();
-    const houseGeojson = await houseGeoRes.json();
 
     // Build lookups: district number -> {name, party, ...} for Senate and House
     const senateLegMap = {};
@@ -84,69 +53,19 @@ async function loadData() {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // County labels for Senate map
-    let countyLabels = [];
+    // County Layer for Senate Map
     const countyLayer = L.geoJSON(counties, {
         style: {
             color: 'black',
             weight: 1,
             fillOpacity: 0,
-            opacity: 0.7
+            opacity: 0.5
         },
         onEachFeature: (feature, layer) => {
             const name = feature.properties.name || feature.properties.NAME || feature.properties.County || 'Unknown';
-            const centroid = getPolygonCentroid(feature.geometry) || layer.getBounds().getCenter();
-            const label = L.marker(centroid, {
-                icon: L.divIcon({
-                    className: 'county-label',
-                    html: name,
-                    iconSize: [120, 30],
-                    iconAnchor: [60, 15]
-                })
-            });
-            countyLabels.push(label);
+            layer.bindPopup(`<strong>County:</strong> ${name}`);
         }
     });
-
-    /**
-     * Custom control for toggling county visibility on Senate map
-     */
-    const CountyToggleControl = L.Control.extend({
-        options: { position: 'bottomright' },
-        onAdd: function(map) {
-            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
-            container.style.backgroundColor = 'white';
-            container.style.padding = '6px';
-            container.style.cursor = 'pointer';
-            container.style.boxShadow = '0 1px 5px rgba(0,0,0,0.65)';
-            container.style.borderRadius = '4px';
-            container.innerHTML = '<span id="county-toggle-btn">Show Counties</span>';
-
-            let countiesVisible = false;
-            container.onclick = function() {
-                countiesVisible = !countiesVisible;
-                if (countiesVisible) {
-                    map.addLayer(countyLayer);
-                    countyLabels.forEach(label => label.addTo(map));
-                    container.innerHTML = '<span id="county-toggle-btn">Hide Counties</span>';
-                } else {
-                    map.removeLayer(countyLayer);
-                    countyLabels.forEach(label => map.removeLayer(label));
-                    container.innerHTML = '<span id="county-toggle-btn">Show Counties</span>';
-                }
-            };
-            return container;
-        }
-    });
-    map.addControl(new CountyToggleControl());
-
-    /**
-     * Creates and adds a district layer to the specified map
-     * 
-     * @param {Object} geojson - GeoJSON data for districts
-     * @param {Object} legMap - Mapping of district numbers to legislator data
-     * @param {L.Map} mapInstance - Leaflet map instance to add the layer to
-     */
     const addDistrictLayer = (geojson, legMap, mapInstance) => {
         L.geoJSON(geojson, {
             style: feature => {
@@ -204,70 +123,40 @@ async function loadData() {
     // Add Senate districts
     addDistrictLayer(senateGeojson, senateLegMap, map);
 
+    // Add a standard layer control to the Senate map
+    const senateOverlayMaps = {
+        "Counties": countyLayer
+    };
+    L.control.layers(null, senateOverlayMaps).addTo(map);
+
+
     // --- Render House Map ---
     const houseMap = L.map('house-map').setView([39.0, -105.5], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }).addTo(houseMap);
 
-    // County overlay for House map
-    let houseCountyLabels = [];
     const houseCountyLayer = L.geoJSON(counties, {
         style: {
             color: 'black',
             weight: 1,
             fillOpacity: 0,
-            opacity: 0.7
+            opacity: 0.5
         },
         onEachFeature: (feature, layer) => {
             const name = feature.properties.name || feature.properties.NAME || feature.properties.County || 'Unknown';
-            const centroid = getPolygonCentroid(feature.geometry) || layer.getBounds().getCenter();
-            const label = L.marker(centroid, {
-                icon: L.divIcon({
-                    className: 'county-label',
-                    html: name,
-                    iconSize: [120, 30],
-                    iconAnchor: [60, 15]
-                })
-            });
-            houseCountyLabels.push(label);
+            layer.bindPopup(`<strong>County:</strong> ${name}`);
         }
     });
-
-    /**
-     * Custom control for toggling county visibility on House map
-     */
-    const HouseCountyToggleControl = L.Control.extend({
-        options: { position: 'bottomright' },
-        onAdd: function(map) {
-            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
-            container.style.backgroundColor = 'white';
-            container.style.padding = '6px';
-            container.style.cursor = 'pointer';
-            container.style.boxShadow = '0 1px 5px rgba(0,0,0,0.65)';
-            container.style.borderRadius = '4px';
-            container.innerHTML = '<span id="house-county-toggle-btn">Show Counties</span>';
-
-            let countiesVisible = false;
-            container.onclick = function() {
-                countiesVisible = !countiesVisible;
-                if (countiesVisible) {
-                    houseMap.addLayer(houseCountyLayer);
-                    houseCountyLabels.forEach(label => label.addTo(houseMap));
-                    container.innerHTML = '<span id="house-county-toggle-btn">Hide Counties</span>';
-                } else {
-                    houseMap.removeLayer(houseCountyLayer);
-                    houseCountyLabels.forEach(label => houseMap.removeLayer(label));
-                    container.innerHTML = '<span id="house-county-toggle-btn">Show Counties</span>';
-                }
-            };
-            return container;
-        }
-    });
-    houseMap.addControl(new HouseCountyToggleControl());
 
     // Add House districts
     addDistrictLayer(houseGeojson, houseLegMap, houseMap);
+
+    // Add a standard layer control to the House map
+    const houseOverlayMaps = {
+        "Counties": houseCountyLayer
+    };
+    L.control.layers(null, houseOverlayMaps).addTo(houseMap);
 }
 
 // Load data when page loads

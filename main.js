@@ -19,6 +19,7 @@ async function loadData() {
         fetch('house_coords.json')
     ]);
     const senateGeojson = await senateGeoRes.json();
+    const houseGeojson = await houseGeoRes.json(); // This line was missing
     const legislators = await legRes.json();
     const counties = await countyRes.json();
 

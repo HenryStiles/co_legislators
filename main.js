@@ -96,11 +96,20 @@ async function loadData() {
                 const committees = (leg?.Committees && leg.Committees.length)
                     ? `<b>Committees:</b><ul>${leg.Committees.map(com => `<li>${com.name}${com.role ? ' (' + com.role + ')' : ''}</li>`).join('')}</ul>`
                     : '<b>Committees:</b> <i>None listed</i>';
+                const pictureHtml = (leg?.Picture && leg.Picture !== "N/A")
+                    ? `<img src="${leg.Picture}" alt="${displayName}" style="width: 80px; height: auto; float: right; margin-left: 10px; border-radius: 4px; border: 1px solid #ccc;">`
+                    : '';
+
                 const popupContent = `
-                    <strong>District ${district} &mdash; ${leg?.Party || 'Unknown Party'}</strong><br>
-                    <span style="font-size:1.1em; font-weight:bold;">${displayName}</span><br>
-                    ${counties}
-                    ${committees}
+                    <div style="min-width: 220px;">
+                        ${pictureHtml}
+                        <strong>District ${district} &mdash; ${leg?.Party || 'Unknown Party'}</strong><br>
+                        <span style="font-size:1.1em; font-weight:bold;">${displayName}</span><br>
+                        <div style="clear: both; padding-top: 5px;">
+                            ${counties}
+                            ${committees}
+                        </div>
+                    </div>
                 `;
                 layer.bindPopup(popupContent);
 

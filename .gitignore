@@ -1,0 +1,24 @@
+# Project Specific
+GEMINI.md
+legislator_picture_update.md
+
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.mypy_cache/
+.pytest_cache/
+.venv/
+env/
+venv/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

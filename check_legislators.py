@@ -12,6 +12,7 @@ Dependencies: json, re
 import json
 import sys
 import re
+import os
 
 def validate_legislators_data():
     """
@@ -23,6 +24,7 @@ def validate_legislators_data():
     - Checks for ASCII compliance in text fields
     - Verifies URL format for links
     - Ensures proper structure for committees and counties
+    - Verifies that profile pictures exist on disk
     
     Returns:
         list: List of tuples containing (index, name, errors) for each legislator with issues
@@ -66,7 +68,7 @@ def validate_legislators_data():
         if not name:
             leg_errors.append('Name is blank')
         elif not ascii_re.match(name):
-            leg_errors.append('Name is not ASCII')
+            leg_errors.append(f'Name is not ASCII: {name}')
         
         # Party: must be non-blank
         if not leg.get('Party'):
@@ -76,6 +78,13 @@ def validate_legislators_data():
         link = leg.get('Link', '')
         if not link or not url_re.match(link):
             leg_errors.append('Link is blank or not a valid URL')
+
+        # Picture: must be non-blank and point to an existing file
+        picture = leg.get('Picture', '')
+        if not picture or picture == "N/A":
+            leg_errors.append('Picture is missing or N/A')
+        elif not os.path.exists(picture):
+            leg_errors.append(f'Picture file does not exist: {picture}')
         
         # Committees: must be a list of dicts with non-blank name
         committees = leg.get('Committees', [])

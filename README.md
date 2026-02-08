@@ -6,33 +6,43 @@ This is an interactive web application that visualizes the legislative districts
 
 -   **Dual Interactive Maps**: Separate, fully interactive maps for both the Colorado Senate and House of Representatives.
 -   **Color-Coded Districts**: Districts are color-coded by political party (Democrat, Republican, or other) for easy visual identification.
--   **Detailed Legislator Popups**: Clicking on a district reveals a popup with detailed information about the legislator, including:
-    -   Full name and party
-    -   Counties served
-    -   Committee assignments
--   **Toggleable Map Layers**: A layer control allows users to toggle the visibility of additional geographical boundaries, including:
-    -   County lines
-    -   Zip code boundaries
--   **Interactive Overlays**: Click on a county or zip code area to see its name or number in a popup.
+-   **Detailed Legislator Popups**: Clicking on a district reveals a popup with detailed information, including:
+    -   **Profile Picture**: Official photograph of the legislator.
+    -   Full name and party affiliation.
+    -   Counties served within the district.
+    -   Current committee assignments and roles.
+-   **Toggleable Map Layers**: A layer control allows users to toggle geographical boundaries, including county lines.
+-   **Interactive Overlays**: Click on a county to see its name in a popup.
 
-## Data Sources
-This project was developed with the assistance of an AI coding assistant, Gemini Code Assist. The AI was utilized for various tasks including code generation, refactoring, debugging, and documentation writing to improve code quality and accelerate development.
+## Data Processing
+
+To refresh the legislator data and download the latest profile pictures:
+
+1.  **Install dependencies**:
+    ```bash
+    pip install requests beautifulsoup4 pandas
+    ```
+2.  **Run the scraper**:
+    ```bash
+    python legs.py
+    ```
+    This script will update `legislators.json` and download images to `images/legislators/`.
+3.  **Validate the data**:
+    ```bash
+    python check_legislators.py
+    ```
 
 ## Data Sources and Citations
 
 The application relies on several data sources to visualize the legislative landscape of Colorado:
 
--   **Legislator Information (`legislators.json`):** Data was compiled from the official Colorado General Assembly website. This file contains legislator names, party affiliations, districts, and committee assignments.
-
--   **District Boundaries (`senate_coords.json`, `house_coords.json`):** Geographic boundary data for Senate and House districts is based on the 2021 approved redistricting plans from the Colorado Independent Redistricting Commissions.
-
--   **County and Zip Code Boundaries (`colorado_counties.geojson`, `co_colorado_zip_codes_geo.min.json`):** These GeoJSON files are derived from the U.S. Census Bureau's TIGER/Line Shapefiles, which provide public geospatial data for various administrative and statistical boundaries.
+-   **Legislator Information & Pictures (`legislators.json`, `images/`):** Scraped from the official [Colorado General Assembly website](https://leg.colorado.gov/legislators).
+-   **District Boundaries (`senate_coords.json`, `house_coords.json`):** Based on the 2021 approved redistricting plans from the Colorado Independent Redistricting Commissions.
+-   **County Boundaries (`colorado_counties.geojson`):** Derived from the U.S. Census Bureau's TIGER/Line Shapefiles.
 
 ## Setup and Usage
 
-This project was developed with the assistance of an AI coding assistant, Gemini Code Assist. The AI was utilized for various tasks including code generation, refactoring, debugging, and documentation writing to improve code quality and accelerate development.
-
-This is a static web application and does not require a complex setup.
+This project was developed with the assistance of an AI coding assistant, Gemini CLI. The AI was utilized for various tasks including code generation, scraping logic implementation, refactoring, and documentation.
 
 1.  **Clone the repository:**
     ```bash

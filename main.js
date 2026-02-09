@@ -111,7 +111,9 @@ async function loadData() {
                         </div>
                     </div>
                 `;
-                layer.bindPopup(popupContent);
+                layer.bindPopup(popupContent, {
+                    autoPanPadding: [10, 50] // [horizontal, vertical] padding
+                });
 
                 // Add non-interactive district label for visual clarity
                 if (leg?.Name) {

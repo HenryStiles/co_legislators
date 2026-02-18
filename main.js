@@ -11,17 +11,20 @@
 
 // Load both GeoJSON and legislator data, then render the map
 async function loadData() {
+    const checkResponse = (res, fileName) => {
+        if (!res.ok) {
+            throw new Error(`Failed to fetch ${fileName}: ${res.status} ${res.statusText}`);
+        }
+        return res.json();
+    };
+
     // Load all data files concurrently
-    const [senateGeoRes, legRes, countyRes, houseGeoRes] = await Promise.all([
-        fetch('senate_coords.json'),
-        fetch('legislators.json'),
-        fetch('colorado_counties.geojson'),
-        fetch('house_coords.json')
+    const [senateGeojson, legislators, counties, houseGeojson] = await Promise.all([
+        fetch('senate_coords.json').then(res => checkResponse(res, 'senate_coords.json')),
+        fetch('legislators.json').then(res => checkResponse(res, 'legislators.json')),
+        fetch('colorado_counties.geojson').then(res => checkResponse(res, 'colorado_counties.geojson')),
+        fetch('house_coords.json').then(res => checkResponse(res, 'house_coords.json'))
     ]);
-    const senateGeojson = await senateGeoRes.json();
-    const houseGeojson = await houseGeoRes.json(); // This line was missing
-    const legislators = await legRes.json();
-    const counties = await countyRes.json();
 
     // Build lookups: district number -> {name, party, ...} for Senate and House
     const senateLegMap = {};
@@ -172,4 +175,4 @@ async function loadData() {
 }
 
 // Load data when page loads
-loadData(); 
+loadData();  ownership

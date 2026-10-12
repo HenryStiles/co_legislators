@@ -50,18 +50,34 @@ def validate_legislators_data():
     url_re = re.compile(r'^https?://')        # Valid URL format
 
     errors = []
+    seen_seats = set()
+    senate_districts = set()
+    house_districts = set()
 
     # Validate each legislator record
     for i, leg in enumerate(data):
         leg_errors = []
         
         # District: must be numeric and not blank
-        if not leg.get('District') or not str(leg['District']).isdigit():
+        dist = str(leg.get('District', '')).strip()
+        if not dist or not dist.isdigit():
             leg_errors.append('District is blank or not numeric')
         
         # Chamber: must be Senate or House
-        if leg.get('Chamber') not in ('Senate', 'House'):
-            leg_errors.append(f"Chamber is invalid: {leg.get('Chamber')}")
+        chamber = leg.get('Chamber', '')
+        if chamber not in ('Senate', 'House'):
+            leg_errors.append(f"Chamber is invalid: {chamber}")
+
+        # Check for duplicate seat assignments
+        if dist and dist.isdigit() and chamber in ('Senate', 'House'):
+            seat_key = (chamber, dist)
+            if seat_key in seen_seats:
+                leg_errors.append(f'Duplicate seat assignment for {chamber} District {dist}')
+            seen_seats.add(seat_key)
+            if chamber == 'Senate':
+                senate_districts.add(int(dist))
+            elif chamber == 'House':
+                house_districts.add(int(dist))
         
         # Name: must be non-blank and ASCII
         name = leg.get('Name', '')
@@ -103,10 +119,34 @@ def validate_legislators_data():
             for county in counties:
                 if not county or not ascii_re.match(county):
                     leg_errors.append(f'County name not ASCII or blank: {county}')
+
+        # Note: optional, but if present must be ASCII
+        note = leg.get('Note', '')
+        if note and not ascii_re.match(note):
+            leg_errors.append(f'Note is not ASCII: {note}')
         
         # Add this legislator's errors to the main error list
         if leg_errors:
             errors.append((i, leg.get('Name', 'Unknown'), leg_errors))
+
+    # Validate overall chamber district coverage (35 Senate, 65 House)
+    expected_senate = set(range(1, 36))
+    expected_house = set(range(1, 66))
+    coverage_errors = []
+
+    missing_senate = sorted(expected_senate - senate_districts)
+    if missing_senate:
+        coverage_errors.append(f"Missing Senate districts: {missing_senate}")
+
+    missing_house = sorted(expected_house - house_districts)
+    if missing_house:
+        coverage_errors.append(f"Missing House districts: {missing_house}")
+
+    if len(data) != 100:
+        coverage_errors.append(f"Expected 100 total seats (35 Senate + 65 House), found {len(data)}")
+
+    if coverage_errors:
+        errors.append((-1, "Chamber Completeness", coverage_errors))
 
     return errors
 
@@ -119,16 +159,17 @@ def main():
     errors = validate_legislators_data()
     
     if errors:
-        print(f'\nValidation errors found ({len(errors)} legislators with issues):')
+        print(f'\nValidation errors found ({len(errors)} issues):')
         print('=' * 60)
         for idx, name, errs in errors:
-            print(f'Legislator #{idx+1} ({name}):')
+            header = f'Legislator #{idx+1} ({name}):' if idx >= 0 else f'{name}:'
+            print(header)
             for err in errs:
                 print(f'  - {err}')
             print()
     else:
         print('✅ All legislators passed validation.')
-        print(f'Total legislators validated: {len(json.load(open("legislators.json")))}')
+        print(f'Total legislators validated: {len(json.load(open("legislators.json")))} (35 Senate, 65 House)')
 
 if __name__ == "__main__":
     main() 

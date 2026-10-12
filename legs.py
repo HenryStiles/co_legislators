@@ -107,7 +107,8 @@ def fetch_legislator_data(url):
         else:
             table_rows = []
 
-        # Process each legislator row
+        # Collect raw legislator rows from table
+        raw_candidates = []
         for row in table_rows:
             # Name is in a 'th', others in 'td'
             cells = row.find_all(['td', 'th'])
@@ -119,6 +120,10 @@ def fetch_legislator_data(url):
                 # Extract name and link (Column 1: Name)
                 name_elem = cells[1].find('a')
                 name = name_elem.get_text(strip=True) if name_elem else "N/A"
+
+                # Extract status note if present (e.g., resignation note)
+                note_elem = cells[1].find('div')
+                note = note_elem.get_text(strip=True) if note_elem else ""
 
                 # Construct full URL for legislator's personal page
                 legislator_link = "N/A"
@@ -135,57 +140,99 @@ def fetch_legislator_data(url):
                 # Extract party affiliation (Column 3: Party)
                 party = cells[3].get_text(strip=True)
 
-                # --- Fetch detail page for committees, counties, and picture ---
-                committees = []
-                counties = []
-                picture_url = "N/A"
-                if legislator_link != "N/A":
-                    try:
-                        # Fetch the individual legislator's detail page
-                        detail_resp = requests.get(legislator_link)
-                        detail_resp.raise_for_status()
-                        detail_soup = BeautifulSoup(detail_resp.text, 'html.parser')
-                        
-                        # Extract profile picture
-                        img_elem = detail_soup.select_one('img.legislator-picture')
-                        if img_elem and 'src' in img_elem.attrs:
-                            picture_url = img_elem['src']
-                            if not picture_url.startswith('http'):
-                                picture_url = base_url + picture_url
-                        
-                        # Extract committee assignments
-                        for cblock in detail_soup.select('.committee-tile-wrapper'):
-                            cname_elem = cblock.select_one('.legislator-detail-committee-title span:last-of-type')
-                            role_elem = cblock.select_one('.comm-mem-role')
-                            cname = cname_elem.get_text(strip=True) if cname_elem else ""
-                            role = role_elem.get_text(strip=True) if role_elem else ""
-                            if cname:
-                                committees.append({"name": cname, "role": role})
-                        
-                        # Extract counties served
-                        for county_elem in detail_soup.select('.county-list li'):
-                            county = county_elem.get_text(strip=True)
-                            if county:
-                                counties.append(county)
-                        
-                        # Be polite to the server with rate limiting
-                        time.sleep(0.1)
-                    except Exception as e:
-                        print(f"Error fetching details for {name}: {e}")
-
-                # Add this legislator's data to our collection
-                local_picture = download_image(picture_url, name)
-
-                legislators_data.append({
-                    "District": district,
-                    "Chamber": chamber,
-                    "Name": name,
-                    "Party": party,
-                    "Link": legislator_link,
-                    "Picture": local_picture,
-                    "Committees": committees,
-                    "Counties": counties
+                raw_candidates.append({
+                    "district": district,
+                    "chamber": chamber,
+                    "name": name,
+                    "party": party,
+                    "link": legislator_link,
+                    "note": note
                 })
+
+        # Group candidates by seat (chamber, district) to handle vacancies/successions
+        seat_map = {}
+        for cand in raw_candidates:
+            seat_key = (cand["chamber"], cand["district"])
+            seat_map.setdefault(seat_key, []).append(cand)
+
+        # Resolve each seat to a single current representative
+        resolved_candidates = []
+        for seat_key, cands in seat_map.items():
+            if len(cands) == 1:
+                resolved_candidates.append(cands[0])
+            else:
+                active = [c for c in cands if 'resigned' not in c['note'].lower()]
+                resigned = [c for c in cands if 'resigned' in c['note'].lower()]
+                if active:
+                    print(f"Seat {seat_key[0]} {seat_key[1]}: selecting active '{active[0]['name']}' over resigned {[r['name'] for r in resigned]}")
+                    resolved_candidates.append(active[0])
+                else:
+                    resolved_candidates.append(cands[0])
+
+        # Sort alphabetically by Name to maintain consistent ordering
+        resolved_candidates.sort(key=lambda c: c["name"])
+
+        # Fetch details for each resolved legislator
+        for cand in resolved_candidates:
+            district = cand["district"]
+            chamber = cand["chamber"]
+            name = cand["name"]
+            party = cand["party"]
+            legislator_link = cand["link"]
+            note = cand["note"]
+
+            # --- Fetch detail page for committees, counties, and picture ---
+            committees = []
+            counties = []
+            picture_url = "N/A"
+            if legislator_link != "N/A":
+                try:
+                    # Fetch the individual legislator's detail page
+                    detail_resp = requests.get(legislator_link)
+                    detail_resp.raise_for_status()
+                    detail_soup = BeautifulSoup(detail_resp.text, 'html.parser')
+                    
+                    # Extract profile picture
+                    img_elem = detail_soup.select_one('img.legislator-picture')
+                    if img_elem and 'src' in img_elem.attrs:
+                        picture_url = img_elem['src']
+                        if not picture_url.startswith('http'):
+                            picture_url = base_url + picture_url
+                    
+                    # Extract committee assignments
+                    for cblock in detail_soup.select('.committee-tile-wrapper'):
+                        cname_elem = cblock.select_one('.legislator-detail-committee-title span:last-of-type')
+                        role_elem = cblock.select_one('.comm-mem-role')
+                        cname = cname_elem.get_text(strip=True) if cname_elem else ""
+                        role = role_elem.get_text(strip=True) if role_elem else ""
+                        if cname:
+                            committees.append({"name": cname, "role": role})
+                    
+                    # Extract counties served
+                    for county_elem in detail_soup.select('.county-list li'):
+                        county = county_elem.get_text(strip=True)
+                        if county:
+                            counties.append(county)
+                    
+                    # Be polite to the server with rate limiting
+                    time.sleep(0.1)
+                except Exception as e:
+                    print(f"Error fetching details for {name}: {e}")
+
+            # Add this legislator's data to our collection
+            local_picture = download_image(picture_url, name)
+
+            legislators_data.append({
+                "District": district,
+                "Chamber": chamber,
+                "Name": name,
+                "Party": party,
+                "Link": legislator_link,
+                "Picture": local_picture,
+                "Committees": committees,
+                "Counties": counties,
+                "Note": note
+            })
     except requests.exceptions.RequestException as e:
         print(f"Error fetching data from {url}: {e}")
     except Exception as e:

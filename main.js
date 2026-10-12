@@ -16,7 +16,16 @@
 
 // Application State
 let allLegislators = [];
+let allZipCodes = [];
 const districtLayers = {
+    Senate: {},
+    House: {}
+};
+const zipLayers = {
+    Senate: null,
+    House: null
+};
+const zipLookup = {
     Senate: {},
     House: {}
 };
@@ -215,15 +224,15 @@ function setupSearchUI() {
     let selectedIndex = -1;
     let currentResults = [];
 
-    // Filter matching legislators
-    const searchLegislators = query => {
+    // Filter matching legislators and ZIP codes
+    const searchItems = query => {
         const q = query.trim().toLowerCase();
         if (!q) return [];
 
         const sdMatch = q.match(/^sd\s*(\d+)$/);
         const hdMatch = q.match(/^hd\s*(\d+)$/);
 
-        return allLegislators.filter(leg => {
+        const matchedLegs = allLegislators.filter(leg => {
             const districtStr = String(leg.District || '');
             if (sdMatch && leg.Chamber === 'Senate' && districtStr === sdMatch[1]) return true;
             if (hdMatch && leg.Chamber === 'House' && districtStr === hdMatch[1]) return true;
@@ -243,6 +252,27 @@ function setupSearchUI() {
                    party.includes(q) ||
                    counties.includes(q);
         });
+
+        // Search matching ZIP codes
+        const zipDigits = q.replace(/^zip\s*/i, '').trim();
+        let matchedZips = [];
+        if (/^\d{2,5}$/.test(zipDigits) && allZipCodes.length > 0) {
+            matchedZips = allZipCodes
+                .filter(z => z.zip.startsWith(zipDigits))
+                .slice(0, 6)
+                .map(z => ({
+                    type: 'zip',
+                    zip: z.zip,
+                    counties: z.counties,
+                    center: z.center
+                }));
+        }
+
+        // If user typed exact 5 digits or starts with "zip", show ZIP results first
+        if ((zipDigits.length === 5 || q.startsWith('zip')) && matchedZips.length > 0) {
+            return [...matchedZips, ...matchedLegs];
+        }
+        return [...matchedLegs, ...matchedZips];
     };
 
     const renderResults = results => {
@@ -251,54 +281,79 @@ function setupSearchUI() {
         dropdown.innerHTML = '';
 
         if (results.length === 0) {
-            dropdown.innerHTML = `<div class="search-no-results">No legislators matching "<em>${escapeHtml(input.value)}</em>"</div>`;
+            dropdown.innerHTML = `<div class="search-no-results">No legislators or ZIP codes matching "<em>${escapeHtml(input.value)}</em>"</div>`;
             dropdown.style.display = 'block';
             return;
         }
 
-        results.slice(0, 10).forEach((leg, idx) => {
+        results.slice(0, 10).forEach((itemData, idx) => {
             const item = document.createElement('div');
             item.className = 'search-result-item';
             item.setAttribute('role', 'option');
             item.setAttribute('data-index', idx);
 
-            const displayName = formatName(leg.Name);
-            const partyClass = (leg.Party || '').toLowerCase().startsWith('dem') ? 'badge-dem' : 
-                               ((leg.Party || '').toLowerCase().startsWith('rep') ? 'badge-rep' : 'badge-senate');
-            const chamberClass = leg.Chamber === 'Senate' ? 'badge-senate' : 'badge-house';
+            if (itemData.type === 'zip') {
+                const countiesText = (itemData.counties && itemData.counties.length)
+                    ? itemData.counties.join(', ') + ' County'
+                    : 'Colorado';
 
-            const avatarHtml = (leg.Picture && leg.Picture !== 'N/A')
-                ? `<img src="${leg.Picture}" alt="${escapeHtml(displayName)}" class="result-avatar" onerror="this.style.display='none'">`
-                : `<div class="result-avatar-fallback">${displayName.charAt(0)}</div>`;
-
-            const noticeBadge = leg.Note ? `<span class="badge badge-notice">Notice</span>` : '';
-            const countiesText = (leg.Counties && leg.Counties.length) ? leg.Counties.join(', ') : 'Colorado';
-
-            item.innerHTML = `
-                ${avatarHtml}
-                <div class="result-info">
-                    <div class="result-name">${escapeHtml(displayName)}</div>
-                    <div class="result-badges">
-                        <span class="badge ${chamberClass}">${escapeHtml(leg.Chamber)} ${escapeHtml(leg.District)}</span>
-                        <span class="badge ${partyClass}">${escapeHtml(leg.Party || 'Unknown')}</span>
-                        ${noticeBadge}
+                item.innerHTML = `
+                    <div class="result-avatar-fallback zip-avatar">📮</div>
+                    <div class="result-info">
+                        <div class="result-name">ZIP ${escapeHtml(itemData.zip)}</div>
+                        <div class="result-badges">
+                            <span class="badge badge-zip">ZIP Code</span>
+                        </div>
+                        <div class="result-counties">${escapeHtml(countiesText)}</div>
                     </div>
-                    <div class="result-counties">${escapeHtml(countiesText)}</div>
-                </div>
-            `;
+                `;
 
-            // CRITICAL FIX: Use mousedown with preventDefault so input blur/change
-            // does NOT destroy the element before the click event finishes.
-            // This guarantees instant 1-click selection!
-            item.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                selectLegislator(leg);
-            });
+                item.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    selectZipCode(itemData);
+                });
 
-            item.addEventListener('click', (e) => {
-                e.stopPropagation();
-                selectLegislator(leg);
-            });
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectZipCode(itemData);
+                });
+            } else {
+                const leg = itemData;
+                const displayName = formatName(leg.Name);
+                const partyClass = (leg.Party || '').toLowerCase().startsWith('dem') ? 'badge-dem' : 
+                                   ((leg.Party || '').toLowerCase().startsWith('rep') ? 'badge-rep' : 'badge-senate');
+                const chamberClass = leg.Chamber === 'Senate' ? 'badge-senate' : 'badge-house';
+
+                const avatarHtml = (leg.Picture && leg.Picture !== 'N/A')
+                    ? `<img src="${leg.Picture}" alt="${escapeHtml(displayName)}" class="result-avatar" onerror="this.style.display='none'">`
+                    : `<div class="result-avatar-fallback">${displayName.charAt(0)}</div>`;
+
+                const noticeBadge = leg.Note ? `<span class="badge badge-notice">Notice</span>` : '';
+                const countiesText = (leg.Counties && leg.Counties.length) ? leg.Counties.join(', ') : 'Colorado';
+
+                item.innerHTML = `
+                    ${avatarHtml}
+                    <div class="result-info">
+                        <div class="result-name">${escapeHtml(displayName)}</div>
+                        <div class="result-badges">
+                            <span class="badge ${chamberClass}">${escapeHtml(leg.Chamber)} ${escapeHtml(leg.District)}</span>
+                            <span class="badge ${partyClass}">${escapeHtml(leg.Party || 'Unknown')}</span>
+                            ${noticeBadge}
+                        </div>
+                        <div class="result-counties">${escapeHtml(countiesText)}</div>
+                    </div>
+                `;
+
+                item.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    selectLegislator(leg);
+                });
+
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectLegislator(leg);
+                });
+            }
 
             dropdown.appendChild(item);
         });
@@ -338,6 +393,19 @@ function setupSearchUI() {
         executeSelection(leg);
     };
 
+    const selectZipCode = zipItem => {
+        input.value = `ZIP ${zipItem.zip}`;
+        dropdown.style.display = 'none';
+        clearBtn.style.display = 'flex';
+
+        if (!mapsReady) {
+            pendingSelection = zipItem;
+            return;
+        }
+
+        executeZipSelection(zipItem);
+    };
+
     const handleSearchInput = () => {
         const val = input.value.trim();
         clearBtn.style.display = val ? 'flex' : 'none';
@@ -346,12 +414,12 @@ function setupSearchUI() {
             currentResults = [];
             return;
         }
-        if (allLegislators.length === 0) {
-            dropdown.innerHTML = `<div class="search-no-results">Loading legislators dataset...</div>`;
+        if (allLegislators.length === 0 && allZipCodes.length === 0) {
+            dropdown.innerHTML = `<div class="search-no-results">Loading datasets...</div>`;
             dropdown.style.display = 'block';
             return;
         }
-        const matches = searchLegislators(val);
+        const matches = searchItems(val);
         renderResults(matches);
     };
 
@@ -373,15 +441,20 @@ function setupSearchUI() {
             return;
         }
 
+        const pick = item => {
+            if (item.type === 'zip') selectZipCode(item);
+            else selectLegislator(item);
+        };
+
         if (e.key === 'Enter') {
             e.preventDefault();
             if (selectedIndex >= 0 && selectedIndex < currentResults.length) {
-                selectLegislator(currentResults[selectedIndex]);
+                pick(currentResults[selectedIndex]);
             } else if (currentResults.length > 0) {
-                selectLegislator(currentResults[0]);
+                pick(currentResults[0]);
             } else {
-                const matches = searchLegislators(input.value);
-                if (matches.length > 0) selectLegislator(matches[0]);
+                const matches = searchItems(input.value);
+                if (matches.length > 0) pick(matches[0]);
             }
             return;
         }
@@ -450,12 +523,14 @@ function executeSelection(leg) {
     }
 
     if (layer && targetMap) {
-        // Zoom in on district + surrounding context using generous padding (80px)
+        // Zoom in on district + surrounding context with generous top padding (320px)
+        // so the popup card and its 'x' close button are never cut off by the top border
         const bounds = layer.getBounds();
         targetMap.flyToBounds(bounds, {
-            padding: [80, 80],
+            paddingTopLeft: [60, 320],
+            paddingBottomRight: [60, 60],
             maxZoom: 13,
-            duration: 1.2
+            duration: 1.0
         });
 
         // Flash highlight outline to immediately draw user's eye to the district
@@ -477,11 +552,76 @@ function executeSelection(leg) {
             layer.setStyle(originalStyle);
         }, 3000);
 
-        // Open the popup at the true visual center (Pole of Inaccessibility)
-        setTimeout(() => {
+        // Open the popup once map animation finishes so autoPan calculates correctly
+        let popupOpened = false;
+        const openCard = () => {
+            if (popupOpened) return;
+            popupOpened = true;
             const popupLatLng = layer._visualCenter || bounds.getCenter();
             layer.openPopup(popupLatLng);
-        }, 650);
+        };
+        targetMap.once('moveend', openCard);
+        setTimeout(openCard, 1100);
+    }
+}
+
+/**
+ * Executes zoom, highlight, and tooltip for a selected ZIP code
+ */
+function executeZipSelection(zipItem) {
+    const senateEl = document.getElementById('senate-section');
+    const houseEl = document.getElementById('house-section');
+    const senateRect = senateEl ? senateEl.getBoundingClientRect() : null;
+    const houseRect = houseEl ? houseEl.getBoundingClientRect() : null;
+
+    let targetMap = senateMap;
+    let chamber = 'Senate';
+    let targetSection = senateEl;
+
+    // Use house map if user is currently scrolled down near the house section
+    if (houseRect && Math.abs(houseRect.top) < Math.abs(senateRect ? senateRect.top : 99999)) {
+        targetMap = houseMap;
+        chamber = 'House';
+        targetSection = houseEl;
+    }
+
+    if (targetSection) {
+        targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // Auto-enable the ZIP layer on the active map if it is not already visible
+    const zipGroup = zipLayers[chamber];
+    if (zipGroup && targetMap && !targetMap.hasLayer(zipGroup)) {
+        targetMap.addLayer(zipGroup);
+    }
+
+    const layer = zipLookup[chamber]?.[String(zipItem.zip)];
+    if (layer && targetMap) {
+        const bounds = layer.getBounds();
+        targetMap.flyToBounds(bounds, {
+            padding: [60, 60],
+            maxZoom: 14,
+            duration: 1.2
+        });
+
+        const origStyle = {
+            weight: 1.8,
+            color: '#7c3aed',
+            fillOpacity: 0
+        };
+
+        // Flash vibrant pink outline
+        layer.setStyle({
+            weight: 4.5,
+            color: '#ec4899',
+            fillOpacity: 0.25
+        });
+
+        setTimeout(() => {
+            layer.setStyle(origStyle);
+        }, 3000);
+    } else if (zipItem.center && targetMap) {
+        targetMap.flyTo(zipItem.center, 13, { duration: 1.2 });
     }
 }
 
@@ -547,9 +687,105 @@ function initChamberMap(containerId) {
 }
 
 /**
+ * Creates an interactive ZIP code boundary layer with zoom-dependent numeric labels
+ */
+function createZipLayer(zipGeojson, mapInstance, chamber) {
+    const zipLayerGroup = L.layerGroup();
+
+    // 1. Polygon boundary layer
+    const polygonLayer = L.geoJSON(zipGeojson, {
+        style: {
+            color: '#7c3aed',         // vibrant purple / violet
+            weight: 1.8,
+            dashArray: '3, 4',        // dotted line
+            fillColor: '#7c3aed',
+            fillOpacity: 0,           // 0 fill normally so district party colors remain clear
+            opacity: 0.85
+        },
+        onEachFeature: (feature, layer) => {
+            const zip = feature.properties.zip || 'Unknown';
+            zipLookup[chamber][String(zip)] = layer;
+        }
+    });
+
+    // 2. Zoom-dependent ZIP label badges (only shown when zoomed in >= 11)
+    const labelLayer = L.layerGroup();
+    if (zipGeojson.features) {
+        zipGeojson.features.forEach(feat => {
+            const center = feat.properties.center;
+            const zip = feat.properties.zip;
+            if (center && zip) {
+                const marker = L.marker([center[0], center[1]], {
+                    icon: L.divIcon({
+                        className: 'zip-label-badge',
+                        html: `<span class="zip-badge-text">${escapeHtml(zip)}</span>`,
+                        iconSize: [46, 18],
+                        iconAnchor: [23, 9]
+                    }),
+                    interactive: false
+                });
+                labelLayer.addLayer(marker);
+            }
+        });
+    }
+
+    zipLayerGroup.addLayer(polygonLayer);
+
+    const updateLabels = () => {
+        if (!mapInstance.hasLayer(zipLayerGroup)) return;
+        if (mapInstance.getZoom() >= 10) {
+            if (!zipLayerGroup.hasLayer(labelLayer)) {
+                zipLayerGroup.addLayer(labelLayer);
+            }
+        } else {
+            if (zipLayerGroup.hasLayer(labelLayer)) {
+                zipLayerGroup.removeLayer(labelLayer);
+            }
+        }
+    };
+
+    mapInstance.on('zoomend', updateLabels);
+    mapInstance.on('layeradd', (e) => {
+        if (e.layer === zipLayerGroup) updateLabels();
+    });
+    updateLabels();
+
+    zipLayers[chamber] = zipLayerGroup;
+    return zipLayerGroup;
+}
+
+/**
+ * Adds a clean visual boundary legend to the map
+ */
+function addMapLegend(mapInstance) {
+    const legend = L.control({ position: 'bottomleft' });
+    legend.onAdd = function() {
+        const div = L.DomUtil.create('div', 'map-legend');
+        div.innerHTML = `
+            <div class="map-legend-title">Boundary Legend</div>
+            <div class="legend-item"><span class="legend-swatch dem"></span> Dem District (Solid)</div>
+            <div class="legend-item"><span class="legend-swatch rep"></span> Rep District (Solid)</div>
+            <div class="legend-item"><span class="legend-line county"></span> County (Dashed)</div>
+            <div class="legend-item"><span class="legend-line zip"></span> ZIP Code (Dotted Purple)</div>
+        `;
+        return div;
+    };
+    legend.addTo(mapInstance);
+}
+
+/**
  * Loads map boundary data and initializes Leaflet layers
  */
-async function loadMapData(senateGeojson, counties, houseGeojson) {
+async function loadMapData(senateGeojson, counties, houseGeojson, zipGeojson) {
+    // Populate allZipCodes for instant search
+    if (zipGeojson && zipGeojson.features) {
+        allZipCodes = zipGeojson.features.map(f => ({
+            zip: f.properties.zip,
+            counties: f.properties.counties || [],
+            center: f.properties.center || null
+        }));
+    }
+
     // Build lookups: district number -> {name, party, ...} for Senate and House
     const senateLegMap = {};
     const houseLegMap = {};
@@ -563,7 +799,7 @@ async function loadMapData(senateGeojson, counties, houseGeojson) {
         }
     });
 
-    // --- Render Senate Map with CARTO Voyager basemap ---
+    // --- Render Senate Map with basemap & overlays ---
     const senateSetup = initChamberMap('map');
     senateMap = senateSetup.map;
 
@@ -639,7 +875,7 @@ async function loadMapData(senateGeojson, counties, houseGeojson) {
                     : '';
 
                 const popupContent = `
-                    <div style="min-width: 220px;">
+                    <div style="min-width: 220px; max-height: 340px; overflow-y: auto;">
                         ${pictureHtml}
                         <strong>District ${district} &mdash; ${escapeHtml(leg?.Party || 'Unknown Party')}</strong><br>
                         <span style="font-size:1.1em; font-weight:bold;">${escapeHtml(displayName)}</span><br>
@@ -652,7 +888,9 @@ async function loadMapData(senateGeojson, counties, houseGeojson) {
                 `;
 
                 layer.bindPopup(popupContent, {
-                    autoPanPadding: [10, 50]
+                    autoPan: true,
+                    autoPanPaddingTopLeft: [30, 90],
+                    autoPanPaddingBottomRight: [30, 40]
                 });
 
                 // Add non-interactive district label placed at the true visual center
@@ -671,11 +909,16 @@ async function loadMapData(senateGeojson, counties, houseGeojson) {
         }).addTo(mapInstance);
     };
 
-    // Add Senate districts & layer controls (Basemaps + Counties overlay)
+    // Add Senate districts & layer controls (Basemaps + Counties + ZIP overlay)
     addDistrictLayer(senateGeojson, senateLegMap, senateMap, 'Senate');
-    L.control.layers(senateSetup.baseMaps, { "County Lines": senateCountyLayer }, { position: 'topright' }).addTo(senateMap);
+    const senateZipLayer = createZipLayer(zipGeojson, senateMap, 'Senate');
+    L.control.layers(senateSetup.baseMaps, { 
+        "County Lines": senateCountyLayer,
+        "ZIP Code Boundaries (Purple)": senateZipLayer
+    }, { position: 'topright' }).addTo(senateMap);
+    addMapLegend(senateMap);
 
-    // --- Render House Map with CARTO Voyager basemap ---
+    // --- Render House Map with basemap & overlays ---
     const houseSetup = initChamberMap('house-map');
     houseMap = houseSetup.map;
 
@@ -695,15 +938,24 @@ async function loadMapData(senateGeojson, counties, houseGeojson) {
 
     // Add House districts & layer controls
     addDistrictLayer(houseGeojson, houseLegMap, houseMap, 'House');
-    L.control.layers(houseSetup.baseMaps, { "County Lines": houseCountyLayer }, { position: 'topright' }).addTo(houseMap);
+    const houseZipLayer = createZipLayer(zipGeojson, houseMap, 'House');
+    L.control.layers(houseSetup.baseMaps, { 
+        "County Lines": houseCountyLayer,
+        "ZIP Code Boundaries (Purple)": houseZipLayer
+    }, { position: 'topright' }).addTo(houseMap);
+    addMapLegend(houseMap);
 
     mapsReady = true;
 
-    // If user clicked a legislator while map was loading, execute now
+    // If user clicked a legislator or ZIP while map was loading, execute now
     if (pendingSelection) {
         const target = pendingSelection;
         pendingSelection = null;
-        executeSelection(target);
+        if (target.type === 'zip') {
+            executeZipSelection(target);
+        } else {
+            executeSelection(target);
+        }
     }
 }
 
@@ -734,17 +986,18 @@ function init() {
             return data;
         });
 
-    // 3. Concurrently fetch heavy map files
+    // 3. Concurrently fetch heavy map and ZIP boundary files
     const mapsPromise = Promise.all([
         fetch('senate_coords.json').then(res => checkResponse(res, 'senate_coords.json')),
         fetch('colorado_counties.geojson').then(res => checkResponse(res, 'colorado_counties.geojson')),
-        fetch('house_coords.json').then(res => checkResponse(res, 'house_coords.json'))
+        fetch('house_coords.json').then(res => checkResponse(res, 'house_coords.json')),
+        fetch('colorado_zip_codes.geojson').then(res => checkResponse(res, 'colorado_zip_codes.geojson'))
     ]);
 
     // 4. Once both legislators and map geometries are ready, build the Leaflet layers
     Promise.all([legislatorsPromise, mapsPromise])
-        .then(([legs, [senateGeo, counties, houseGeo]]) => {
-            loadMapData(senateGeo, counties, houseGeo);
+        .then(([legs, [senateGeo, counties, houseGeo, zipGeo]]) => {
+            loadMapData(senateGeo, counties, houseGeo, zipGeo);
         })
         .catch(err => {
             console.error('Error loading map data:', err);

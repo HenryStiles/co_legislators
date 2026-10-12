@@ -5,14 +5,16 @@ This is an interactive web application that visualizes the legislative districts
 ## Features
 
 -   **Dual Interactive Maps**: Separate, fully interactive maps for both the Colorado Senate and House of Representatives.
+-   **Instant Search & Zoom**: Search bar with real-time autocomplete for legislators, districts (e.g. *SD 18*, *HD 10*), and ZIP codes (e.g. *80302*). Selecting an item smoothly flies to the district with generous context padding.
 -   **Color-Coded Districts**: Districts are color-coded by political party (Democrat, Republican, or other) for easy visual identification.
 -   **Detailed Legislator Popups**: Clicking on a district reveals a popup with detailed information, including:
     -   **Profile Picture**: Official photograph of the legislator.
     -   Full name and party affiliation.
     -   Counties served within the district.
     -   Current committee assignments and roles.
--   **Toggleable Map Layers**: A layer control allows users to toggle geographical boundaries, including county lines.
--   **Interactive Overlays**: Click on a county to see its name in a popup.
+-   **Toggleable Basemaps & Overlays**: Choose between OpenStreetMap (with street names and building footprints for canvassing), Esri World Street Map, Satellite with Streets, and CARTO Voyager.
+-   **County & ZIP Code Boundaries**: Toggleable county lines and dotted purple ZIP code boundary layers, with on-map ZIP code badges at neighborhood zoom levels.
+-   **Pole of Inaccessibility Centering**: District labels and popups use the `polylabel` algorithm to visually center labels strictly within irregular or concave district boundaries.
 
 ## Data Processing
 
@@ -39,31 +41,27 @@ The application relies on several data sources to visualize the legislative land
 -   **Legislator Information & Pictures (`legislators.json`, `images/`):** Scraped from the official [Colorado General Assembly website](https://leg.colorado.gov/legislators).
 -   **District Boundaries (`senate_coords.json`, `house_coords.json`):** Based on the 2021 approved redistricting plans from the Colorado Independent Redistricting Commissions.
 -   **County Boundaries (`colorado_counties.geojson`):** Derived from the U.S. Census Bureau's TIGER/Line Shapefiles.
+-   **ZIP Code Boundaries (`colorado_zip_codes.geojson`):** Derived from U.S. Census Bureau ZCTA data.
 
 ## Setup and Usage
 
-This project was developed with the assistance of an AI coding assistant, Gemini CLI. The AI was utilized for various tasks including code generation, scraping logic implementation, refactoring, and documentation.
-
 1.  **Clone the repository:**
     ```bash
-    git clone <repository-url>
+    git clone git@github.com:HenryStiles/co_legislators.git
     cd co_legislators
     ```
 
 2.  **Serve the files:**
-    You need a simple local web server to run the `index.html` file. A common way to do this is with Python's built-in HTTP server.
-
-    If you have Python 3:
+    You need a local web server to run the `index.html` file due to CORS restrictions on local JSON files.
+    
+    Using the included development server (with no-cache headers enabled):
     ```bash
-    python -m http.server
+    python server.py 8001
     ```
-
-    If you have Python 2:
+    Or Python's built-in server:
     ```bash
-    python -m SimpleHTTPServer
+    python -m http.server 8000
     ```
-
-    Alternatively, you can use the Live Server extension for Visual Studio Code.
 
 3.  **Open in your browser:**
-    Navigate to `http://localhost:8000` (or the port specified by your server) in your web browser to view the maps.
+    Navigate to `http://localhost:8001` (or the port specified by your server) in your web browser to view the maps.
